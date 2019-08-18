@@ -20,17 +20,18 @@ def parse_args():
     """Parse input arguments."""
     parser = argparse.ArgumentParser(description='Head pose estimation using the Hopenet network.')
     parser.add_argument('--gpu', dest='gpu_id', help='GPU device id to use [0]',
-            default=0, type=int)
+                        default=0, type=int)
     parser.add_argument('--data_dir', dest='data_dir', help='Directory path for data.',
-          default='', type=str)
-    parser.add_argument('--filename_list', dest='filename_list', help='Path to text file containing relative paths for every example.',
-          default='', type=str)
+                        default='', type=str)
+    parser.add_argument('--filename_list', dest='filename_list',
+                        help='Path to text file containing relative paths for every example.',
+                        default='', type=str)
     parser.add_argument('--snapshot', dest='snapshot', help='Name of model snapshot.',
-          default='', type=str)
+                        default='', type=str)
     parser.add_argument('--batch_size', dest='batch_size', help='Batch size.',
-          default=1, type=int)
+                        default=1, type=int)
     parser.add_argument('--save_viz', dest='save_viz', help='Save images with pose cube.',
-          default=False, type=bool)
+                        default=False, type=bool)
     parser.add_argument('--dataset', dest='dataset', help='Dataset type.', default='AFLW2000', type=str)
 
     args = parser.parse_args()
@@ -48,7 +49,7 @@ if __name__ == '__main__':
     snapshot_path = args.snapshot
 
     # ResNet50 structure
-    model = hopenet.Hopenet(torchvision.models.resnet.Bottleneck, [3, 4, 6, 3], 66)
+    model = hopenet.MobileNetV2_angle_header()
 
     print 'Loading snapshot.'
     # Load snapshot
@@ -57,9 +58,9 @@ if __name__ == '__main__':
 
     print 'Loading data.'
 
-    transformations = transforms.Compose([transforms.Resize(350),
-    transforms.CenterCrop(224), transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+    transformations = transforms.Compose([transforms.Resize(300),
+                                          transforms.CenterCrop(224), transforms.ToTensor(),
+                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
     if args.dataset == 'Pose_300W_LP':
         pose_dataset = datasets.Pose_300W_LP(args.data_dir, args.filename_list, transformations)
@@ -81,8 +82,8 @@ if __name__ == '__main__':
         print 'Error: not a valid dataset name'
         sys.exit()
     test_loader = torch.utils.data.DataLoader(dataset=pose_dataset,
-                                               batch_size=args.batch_size,
-                                               num_workers=2)
+                                              batch_size=args.batch_size,
+                                              num_workers=2)
     print len(pose_dataset)
     model.to(device)
 
@@ -105,9 +106,9 @@ if __name__ == '__main__':
         images = images.to(device)
         total += cont_labels.size(0)
 
-        label_yaw = cont_labels[:,0].float()
-        label_pitch = cont_labels[:,1].float()
-        label_roll = cont_labels[:,2].float()
+        label_yaw = cont_labels[:, 0].float()
+        label_pitch = cont_labels[:, 1].float()
+        label_roll = cont_labels[:, 2].float()
 
         yaw, pitch, roll = model(images)
 
@@ -138,14 +139,18 @@ if __name__ == '__main__':
             else:
                 cv2_img = cv2.imread(os.path.join(args.data_dir, name + '.jpg'))
             if args.batch_size == 1:
-                error_string = 'y %.2f, p %.2f, r %.2f' % (torch.sum(torch.abs(yaw_predicted - label_yaw)), torch.sum(torch.abs(pitch_predicted - label_pitch)), torch.sum(torch.abs(roll_predicted - label_roll)))
-                cv2.putText(cv2_img, error_string, (30, cv2_img.shape[0]- 30), fontFace=1, fontScale=1, color=(0,0,255), thickness=2)
+                error_string = 'y %.2f, p %.2f, r %.2f' % (
+                torch.sum(torch.abs(yaw_predicted - label_yaw)), torch.sum(torch.abs(pitch_predicted - label_pitch)),
+                torch.sum(torch.abs(roll_predicted - label_roll)))
+                cv2.putText(cv2_img, error_string, (30, cv2_img.shape[0] - 30), fontFace=1, fontScale=1,
+                            color=(0, 0, 255), thickness=2)
             utils.plot_pose_cube(cv2_img, yaw_predicted[0], pitch_predicted[0], roll_predicted[0], size=100)
-            utils.draw_axis(cv2_img, yaw_predicted[0], pitch_predicted[0], roll_predicted[0], tdx = 200, tdy= 200, size=100)
+            utils.draw_axis(cv2_img, yaw_predicted[0], pitch_predicted[0], roll_predicted[0], tdx=200, tdy=200,
+                            size=100)
             cv2.imwrite(os.path.join('output/images', name + '.jpg'), cv2_img)
 
-    print('Test error in degrees of the model on the ' + str(total) + ' test images. Yaw: %.4f, Pitch: %.4f, Roll: %.4f'% (yaw_error / total,
-    pitch_error / total, roll_error / total))
+    print('Test error in degrees of the model on the ' + str(
+        total) + ' test images. Yaw: %.4f, Pitch: %.4f, Roll: %.4f' % (yaw_error / total,
+                                                         pitch_error / total, roll_error / total))
     end = timeit.timeit()
-
-    print "The inference ran for % seconds." % (end - start)
+    print 'The inference ran for % seconds.' % (end - start)

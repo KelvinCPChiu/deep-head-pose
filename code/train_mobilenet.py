@@ -44,38 +44,6 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-
-def get_ignored_params(model):
-    # Generator function that yields ignored params.
-    b = [model.conv1, model.bn1, model.fc_finetune]
-    for i in range(len(b)):
-        for module_name, module in b[i].named_modules():
-            if 'bn' in module_name:
-                module.eval()
-            for name, param in module.named_parameters():
-                yield param
-
-
-def get_non_ignored_params(model):
-    # Generator function that yields params that will be optimized.
-    b = [model.layer1, model.layer2, model.layer3, model.layer4]
-    for i in range(len(b)):
-        for module_name, module in b[i].named_modules():
-            if 'bn' in module_name:
-                module.eval()
-            for name, param in module.named_parameters():
-                yield param
-
-
-def get_fc_params(model):
-    # Generator function that yields fc layer params.
-    b = [model.fc_yaw, model.fc_pitch, model.fc_roll]
-    for i in range(len(b)):
-        for module_name, module in b[i].named_modules():
-            for name, param in module.named_parameters():
-                yield param
-
-
 def load_filtered_state_dict(model, snapshot):
     # By user apaszke from discuss.pytorch.org
     model_dict = model.state_dict()
@@ -107,10 +75,11 @@ if __name__ == '__main__':
 
     # The number of bins could be changed along with the idx 66 below in the training function.
 
-    model = hopenet.Hopenet(torchvision.models.resnet.Bottleneck, [3, 4, 6, 3], num_bins)
+    model = hopenet.MobileNetV2_angle_header()
 
     if args.snapshot == '':
-        load_filtered_state_dict(model, model_zoo.load_url('https://download.pytorch.org/models/resnet50-19c8e357.pth'))
+        pass
+        #load_filtered_state_dict(model, model_zoo.load_url('https://download.pytorch.org/models/resnet50-19c8e357.pth'))
     else:
         saved_state_dict = torch.load(args.snapshot)
         model.load_state_dict(saved_state_dict)
@@ -163,12 +132,8 @@ if __name__ == '__main__':
 
     # We do not need to write the optimizer in this way.
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=10**-5, eps=10**-8)
+    optimizer = torch.optim.Adam(model.parameters())
 
-    #upp = torch.tensor([66]).to(device)
-    #ddo = torch.tensor([-1]).to(device)
-
-    #test_net = test_hope_net()
     print 'Ready to train network.'
     for epoch in range(num_epochs):
         for i, (images, labels, cont_labels, name) in enumerate(train_loader):
@@ -186,18 +151,6 @@ if __name__ == '__main__':
 
             # Forward pass
             yaw, pitch, roll = model(images)
-
-            #tuple = (label_yaw, label_pitch, label_roll)
-            #for data in tuple:
-            #    test_u = torch.any(torch.gt(data, upp))
-            #    test_d = torch.any(torch.lt(data, ddo))
-            #    test = torch.any(torch.eq(data, 0))
-            #    test_1 = torch.any(torch.eq(data, 1))
-            #    if test_d or test_u:
-            #        print 'Mini-batch Index :', i, name
-            #        print(data)
-            #   if test or test_1:
-            #        print(data)
 
             # Cross entropy loss
             loss_yaw = criterion(yaw, label_yaw)
@@ -239,107 +192,3 @@ if __name__ == '__main__':
             print 'Taking snapshot...'
             torch.save(model.state_dict(),
             'output/snapshot/' + args.output_string + '_epoch_'+ str(epoch+1) + '.pkl')
-
-
-class test_hope_net(object):
-    """Adding Testing for Early Stopping Implementation."""
-    def __init__(self, data_dir, transformation, device, num_bin):
-
-        args.data_dir = data_dir
-        args.filename_list = data_dir
-        args.dataset = 'AFLW2000'
-        self.transformations = transformation
-        self.device = device
-        self.num_bin = num_bin
-
-        idx_tensor = [idx for idx in xrange(67)]
-        self.idx_tensor = torch.FloatTensor(idx_tensor).to(self.device)
-        if args.dataset == 'Pose_300W_LP':
-            pose_dataset = datasets.Pose_300W_LP(args.data_dir, args.filename_list, self.transformations)
-        elif args.dataset == 'Pose_300W_LP_random_ds':
-            pose_dataset = datasets.Pose_300W_LP_random_ds(args.data_dir, args.filename_list, self.transformations)
-        elif args.dataset == 'AFLW2000':
-            pose_dataset = datasets.AFLW2000(args.data_dir, args.filename_list, self.transformations)
-        elif args.dataset == 'AFLW2000_ds':
-            pose_dataset = datasets.AFLW2000_ds(args.data_dir, args.filename_list, self.transformations)
-        elif args.dataset == 'BIWI':
-            pose_dataset = datasets.BIWI(args.data_dir, args.filename_list, self.transformations)
-        elif args.dataset == 'AFLW':
-            pose_dataset = datasets.AFLW(args.data_dir, args.filename_list, self.transformations)
-        elif args.dataset == 'AFLW_aug':
-            pose_dataset = datasets.AFLW_aug(args.data_dir, args.filename_list, self.transformations)
-        elif args.dataset == 'AFW':
-            pose_dataset = datasets.AFW(args.data_dir, args.filename_list, self.transformations)
-        else:
-            print 'Error: not a valid dataset name'
-            sys.exit()
-
-        self.test_loader = torch.utils.data.DataLoader(dataset=pose_dataset,
-                                                   batch_size=args.batch_size,
-                                                   num_workers=2)
-
-    def test_network(self):
-
-        print 'Ready to test network.'
-
-        total = 0
-
-        yaw_error = .0
-        pitch_error = .0
-        roll_error = .0
-
-        l1loss = torch.nn.L1Loss(size_average=False)
-
-        for i, (images, labels, cont_labels, name) in enumerate(self.test_loader):
-            images = Variable(images).cuda(gpu)
-            total += cont_labels.size(0)
-
-            label_yaw = cont_labels[:,0].float()
-            label_pitch = cont_labels[:,1].float()
-            label_roll = cont_labels[:,2].float()
-
-            yaw, pitch, roll = model(images)
-
-            # Binned predictions
-            _, yaw_bpred = torch.max(yaw.data, 1)
-            _, pitch_bpred = torch.max(pitch.data, 1)
-            _, roll_bpred = torch.max(roll.data, 1)
-
-            # Continuous predictions
-            yaw_predicted = utils.softmax_temperature(yaw.data, 1)
-            pitch_predicted = utils.softmax_temperature(pitch.data, 1)
-            roll_predicted = utils.softmax_temperature(roll.data, 1)
-
-            yaw_predicted = torch.sum(yaw_predicted * idx_tensor, 1).cpu() * 3 - 99
-            pitch_predicted = torch.sum(pitch_predicted * idx_tensor, 1).cpu() * 3 - 99
-            roll_predicted = torch.sum(roll_predicted * idx_tensor, 1).cpu() * 3 - 99
-
-            # Mean absolute error
-            yaw_error += torch.sum(torch.abs(yaw_predicted - label_yaw))
-            pitch_error += torch.sum(torch.abs(pitch_predicted - label_pitch))
-            roll_error += torch.sum(torch.abs(roll_predicted - label_roll))
-
-            # Save first image in batch with pose cube or axis.
-            if args.save_viz:
-                name = name[0]
-                if args.dataset == 'BIWI':
-                    cv2_img = cv2.imread(os.path.join(args.data_dir, name + '_rgb.png'))
-                else:
-                    cv2_img = cv2.imread(os.path.join(args.data_dir, name + '.jpg'))
-                if args.batch_size == 1:
-                    error_string = 'y %.2f, p %.2f, r %.2f' % \
-                                   (torch.sum(torch.abs(yaw_predicted - label_yaw)),
-                                    torch.sum(torch.abs(pitch_predicted - label_pitch)),
-                                    torch.sum(torch.abs(roll_predicted - label_roll)))
-                    cv2.putText(cv2_img, error_string, (30, cv2_img.shape[0]- 30), fontFace=1, fontScale=1, color=(0,0,255), thickness=2)
-                # utils.plot_pose_cube(cv2_img, yaw_predicted[0], pitch_predicted[0], roll_predicted[0], size=100)
-                utils.draw_axis(cv2_img, yaw_predicted[0], pitch_predicted[0], roll_predicted[0], tdx = 200, tdy= 200, size=100)
-                cv2.imwrite(os.path.join('output/images', name + '.jpg'), cv2_img)
-
-        print('Test error in degrees of the model on the ' + str(total) +
-                ' test images. Yaw: %.4f, Pitch: %.4f, Roll: %.4f' %
-              (yaw_error / total,
-               pitch_error / total,
-               roll_error / total))
-
-        return yaw_error, pitch_error, roll_error

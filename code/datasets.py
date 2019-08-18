@@ -11,12 +11,41 @@ from PIL import Image, ImageFilter
 
 import utils
 
-def get_list_from_filenames(file_path):
-    # input:    relative path to .txt file with file names
-    # output:   list of relative path names
-    with open(file_path) as f:
-        lines = f.read().splitlines()
-    return lines
+# All the -1 is removed
+# As the numpy.digitize will already give 0 to 66 instead.
+
+
+def get_list_from_filenames(dataset_path='../Datasets/300W_LP/', img_ext=None):
+
+    if img_ext is not None and '300W_LP' in dataset_path:
+
+        dataset_path = dataset_path
+
+        folder_list = ('AFW', 'HELEN', 'IBUG', 'LFPW')
+
+        path_list = [path for path in os.listdir(dataset_path) if any(x in path for x in folder_list)]
+
+        folder_dir = [path_list[x] for x in range(len(path_list))]
+
+        name_list = []
+
+        for folder_ in folder_dir:
+            sub_list = [os.path.join(folder_, name).strip('.jpg') for name in
+                        os.listdir(os.path.join(dataset_path, folder_)) if '.jpg' in name]
+            name_list += sub_list
+
+        return name_list
+
+    elif img_ext is not None and 'AFLW2000' in dataset_path:
+
+        dataset_path = dataset_path
+
+        name_list = [name.strip('.jpg') for name in os.listdir(dataset_path) if '.jpg' in name]
+
+        return name_list
+
+    else:
+        raise NameError('Dataloader for dataset other than AFLW2000 and 300W_LP is not implemented.')
 
 class Synhead(Dataset):
     def __init__(self, data_dir, csv_path, transform, test=False):
@@ -65,6 +94,8 @@ class Synhead(Dataset):
         # Bin values
         bins = np.array(range(-99, 102, 3))
         binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
 
         labels = torch.LongTensor(binned_pose)
         cont_labels = torch.FloatTensor([yaw, pitch, roll])
@@ -77,6 +108,7 @@ class Synhead(Dataset):
     def __len__(self):
         return self.length
 
+
 class Pose_300W_LP(Dataset):
     # Head pose from 300W-LP dataset
     def __init__(self, data_dir, filename_path, transform, img_ext='.jpg', annot_ext='.mat', image_mode='RGB'):
@@ -85,7 +117,7 @@ class Pose_300W_LP(Dataset):
         self.img_ext = img_ext
         self.annot_ext = annot_ext
 
-        filename_list = get_list_from_filenames(filename_path)
+        filename_list = get_list_from_filenames(filename_path, img_ext)
 
         self.X_train = filename_list
         self.y_train = filename_list
@@ -132,12 +164,14 @@ class Pose_300W_LP(Dataset):
             img = img.filter(ImageFilter.BLUR)
 
         # Bin values
-        bins = np.array(range(-99, 102, 3))
+        bins = np.array(range(-99, 100, 3))
         binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
 
         # Get target tensors
         labels = binned_pose
-        cont_labels = torch.FloatTensor([yaw, pitch, roll])
+        cont_labels = torch.tensor([yaw, pitch, roll], dtype=torch.float, requires_grad=False)
 
         if self.transform is not None:
             img = self.transform(img)
@@ -148,6 +182,7 @@ class Pose_300W_LP(Dataset):
         # 122,450
         return self.length
 
+
 class Pose_300W_LP_random_ds(Dataset):
     # 300W-LP dataset with random downsampling
     def __init__(self, data_dir, filename_path, transform, img_ext='.jpg', annot_ext='.mat', image_mode='RGB'):
@@ -156,7 +191,7 @@ class Pose_300W_LP_random_ds(Dataset):
         self.img_ext = img_ext
         self.annot_ext = annot_ext
 
-        filename_list = get_list_from_filenames(filename_path)
+        filename_list = get_list_from_filenames(filename_path, img_ext)
 
         self.X_train = filename_list
         self.y_train = filename_list
@@ -209,10 +244,12 @@ class Pose_300W_LP_random_ds(Dataset):
         # Bin values
         bins = np.array(range(-99, 102, 3))
         binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
 
         # Get target tensors
         labels = binned_pose
-        cont_labels = torch.FloatTensor([yaw, pitch, roll])
+        cont_labels = torch.tensor([yaw, pitch, roll],dtype=torch.float, requires_grad=False)
 
         if self.transform is not None:
             img = self.transform(img)
@@ -223,6 +260,7 @@ class Pose_300W_LP_random_ds(Dataset):
         # 122,450
         return self.length
 
+
 class AFLW2000(Dataset):
     def __init__(self, data_dir, filename_path, transform, img_ext='.jpg', annot_ext='.mat', image_mode='RGB'):
         self.data_dir = data_dir
@@ -230,7 +268,7 @@ class AFLW2000(Dataset):
         self.img_ext = img_ext
         self.annot_ext = annot_ext
 
-        filename_list = get_list_from_filenames(filename_path)
+        filename_list = get_list_from_filenames(filename_path, img_ext)
 
         self.X_train = filename_list
         self.y_train = filename_list
@@ -265,7 +303,11 @@ class AFLW2000(Dataset):
         roll = pose[2] * 180 / np.pi
         # Bin values
         bins = np.array(range(-99, 102, 3))
-        labels = torch.LongTensor(np.digitize([yaw, pitch, roll], bins) - 1)
+        binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
+
+        labels = torch.LongTensor(binned_pose)
         cont_labels = torch.FloatTensor([yaw, pitch, roll])
 
         if self.transform is not None:
@@ -324,9 +366,12 @@ class AFLW2000_ds(Dataset):
         roll = pose[2] * 180 / np.pi
         # Bin values
         bins = np.array(range(-99, 102, 3))
-        labels = torch.LongTensor(np.digitize([yaw, pitch, roll], bins) - 1)
-        cont_labels = torch.FloatTensor([yaw, pitch, roll])
+        binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
 
+        labels = torch.LongTensor(binned_pose)
+        cont_labels = torch.FloatTensor([yaw, pitch, roll])
         if self.transform is not None:
             img = self.transform(img)
 
@@ -377,7 +422,11 @@ class AFLW_aug(Dataset):
 
         # Bin values
         bins = np.array(range(-99, 102, 3))
-        labels = torch.LongTensor(np.digitize([yaw, pitch, roll], bins) - 1)
+        binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
+
+        labels = torch.LongTensor(binned_pose)
         cont_labels = torch.FloatTensor([yaw, pitch, roll])
 
         if self.transform is not None:
@@ -421,7 +470,11 @@ class AFLW(Dataset):
         roll *= -1
         # Bin values
         bins = np.array(range(-99, 102, 3))
-        labels = torch.LongTensor(np.digitize([yaw, pitch, roll], bins) - 1)
+        binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
+
+        labels = torch.LongTensor(binned_pose)
         cont_labels = torch.FloatTensor([yaw, pitch, roll])
 
         if self.transform is not None:
@@ -476,7 +529,11 @@ class AFW(Dataset):
 
         # Bin values
         bins = np.array(range(-99, 102, 3))
-        labels = torch.LongTensor(np.digitize([yaw, pitch, roll], bins) - 1)
+        binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+        map_to_minus = np.where(binned_pose == 66)
+        binned_pose[map_to_minus] = -1
+
+        labels = torch.LongTensor(binned_pose)
         cont_labels = torch.FloatTensor([yaw, pitch, roll])
 
         if self.transform is not None:
@@ -554,6 +611,10 @@ class BIWI(Dataset):
         # Bin values
         bins = np.array(range(-99, 102, 3))
         binned_pose = np.digitize([yaw, pitch, roll], bins) - 1
+
+        map_to_minus = np.where(binned_pose == 66)
+
+        binned_pose[map_to_minus] = -1
 
         labels = torch.LongTensor(binned_pose)
         cont_labels = torch.FloatTensor([yaw, pitch, roll])
