@@ -1,5 +1,9 @@
 # Hopenet #
 
+# Editted for Pytorch 1.2 for Python 2.7
+# Added a Folder reader directly read the data from the data directory
+# Added Multi-headers MobileNetV2 for Deep-Head-Pose
+
 <div align="center">
   <img src="https://i.imgur.com/K7jhHOg.png" width="380"><br><br>
 </div>
