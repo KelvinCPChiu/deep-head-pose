@@ -25,7 +25,7 @@ python code/train_mobilenet.py --data_dir './Datasets/300W_LP' --filename_list '
 
 To Test MobileNet :
 ```bash
-python code/test_mobilenet.py --data_dir './Datasets/AFLW2000/' --filename_list './Datasets/AFLW2000/' --dataset 'AFLW2000' --snapshot './output/snapshot/_epoch_2.pkl'
+python code/test_mobilenet.py --data_dir './Datasets/AFLW2000/' --filename_list './Datasets/AFLW2000/' --dataset 'AFLW2000' --snapshot './output/snapshot/_epoch_5.pkl'
 ```
 _______________________________________________________________________________
 
