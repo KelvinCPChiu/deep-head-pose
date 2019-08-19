@@ -11,6 +11,23 @@ Added Multi-headers MobileNetV2 for Deep-Head-Pose.
 
 ______________________________________________________________________________
 
+Create a *Datasets* directory under *deep-head-pose-master*
+
+Unzip the 300W_LP and AFLW_2000 under it.
+
+______________________________________________________________________________
+To Train MobileNet :
+
+```bash
+python code/train_mobilenet.py --data_dir './Datasets/300W_LP' --filename_list './Datasets/300W_LP' --dataset 'Pose_300W_LP'
+```
+
+To Test MobileNet :
+```bash
+python code/test_mobilenet.py --data_dir './Datasets/AFLW2000/' --filename_list './Datasets/AFLW2000/' --dataset 'AFLW2000' --snapshot './output/snapshot/_epoch_2.pkl'
+```
+_______________________________________________________________________________
+
 
 <div align="center">
   <img src="https://i.imgur.com/K7jhHOg.png" width="380"><br><br>
