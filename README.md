@@ -10,6 +10,7 @@ Added a Folder reader directly read the data from the data directory.
 Added Multi-headers MobileNetV2 for Deep-Head-Pose.
 
 ______________________________________________________________________________
+To use the modified dataset.py
 
 Create a *Datasets* directory under *deep-head-pose-master*
 
