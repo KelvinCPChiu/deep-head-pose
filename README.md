@@ -3,7 +3,7 @@
 
 18/08/2019 
 _____________________________________________________________________________
-Editted for Pytorch 1.2 for Python 2.7.
+Editted for Pytorch 1.2 with Python 2.7.
 
 Added a Folder reader directly read the data from the data directory.
 
